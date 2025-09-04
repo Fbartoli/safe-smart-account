@@ -23,10 +23,6 @@ on:
         required: false
         default: false
         type: boolean
-      infura_id:
-        description: 'Infura Project ID for network connectivity'
-        required: false
-        type: string
       tag:
         description: 'Version tag to deploy'
         required: true
