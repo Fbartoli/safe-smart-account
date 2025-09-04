@@ -10,10 +10,6 @@ on:
         type: choice
         options:
         - custom
-        - sepolia
-        - mainnet
-        - gnosis
-        - zksync
       custom_node_url:
         description: 'Custom RPC endpoint URL (required when network=custom)'
         required: false
@@ -53,24 +49,18 @@ jobs:
             cache_key: "npm"
             install_cmd: "npm ci --ignore-scripts"
             build_cmd: "npm run build"
-            deploy_cmd: "npx hardhat deploy-contracts"
-            verify_cmd: "npx hardhat etherscan-verify --force-license true --license LGPL-3.0 && npx hardhat sourcify"
             
           - tag: "v1.3.0-1"
             package_manager: "npm"
             cache_key: "npm"
             install_cmd: "npm ci --ignore-scripts"
             build_cmd: "npm run build"
-            deploy_cmd: "npx hardhat deploy-contracts"
-            verify_cmd: "npx hardhat etherscan-verify --force-license true --license LGPL-3.0 && npx hardhat sourcify"
             
           - tag: "v1.3.0-libs.0"
             package_manager: "yarn"
             cache_key: "yarn"
             install_cmd: "yarn install --frozen-lockfile"
             build_cmd: "yarn build"
-            deploy_cmd: "yarn deploy-all"
-            verify_cmd: "yarn hardhat etherscan-verify && yarn hardhat local-verify"
 
     steps:
     - name: Checkout code
@@ -104,7 +94,11 @@ jobs:
         NODE_URL: ${{ github.event.inputs.network == 'custom' && github.event.inputs.custom_node_url || secrets.NODE_URL }}
       run: |
         echo "🚀 Deploying ${{ matrix.tag }} to ${{ github.event.inputs.network || 'sepolia' }} network"
-        ${{ matrix.deploy_cmd }} --network ${{ github.event.inputs.network || 'sepolia' }}
+        if [ "${{ matrix.tag }}" = "v1.3.0-libs.0" ]; then
+          yarn deploy-all ${{ github.event.inputs.network || 'sepolia' }}
+        else
+          npx hardhat deploy-contracts --network ${{ github.event.inputs.network || 'sepolia' }}
+        fi
 
     - name: Verify contracts (${{ matrix.tag }})
       if: ${{ github.event.inputs.verify_only == 'true' }}
@@ -116,7 +110,13 @@ jobs:
         NODE_URL: ${{ github.event.inputs.network == 'custom' && github.event.inputs.custom_node_url || secrets.NODE_URL }}
       run: |
         echo "🔍 Verifying ${{ matrix.tag }} on ${{ github.event.inputs.network || 'sepolia' }} network"
-        ${{ matrix.verify_cmd }} --network ${{ github.event.inputs.network || 'sepolia' }}
+        if [ "${{ matrix.tag }}" = "v1.3.0-libs.0" ]; then
+          yarn hardhat --network ${{ github.event.inputs.network || 'sepolia' }} etherscan-verify
+          yarn hardhat --network ${{ github.event.inputs.network || 'sepolia' }} local-verify
+        else
+          npx hardhat etherscan-verify --network ${{ github.event.inputs.network || 'sepolia' }} --force-license true --license LGPL-3.0
+          npx hardhat sourcify --network ${{ github.event.inputs.network || 'sepolia' }}
+        fi
 
     - name: Upload deployment artifacts (${{ matrix.tag }})
       if: ${{ github.event.inputs.verify_only != 'true' }}
