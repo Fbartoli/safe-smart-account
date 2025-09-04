@@ -6,9 +6,13 @@ on:
       network:
         description: 'Target network for deployment'
         required: true
-        default: 'custom'
+        default: 'sepolia'
         type: choice
         options:
+        - sepolia
+        - mainnet
+        - gnosis
+        - zksync
         - custom
       custom_node_url:
         description: 'Custom RPC endpoint URL (required when network=custom)'
@@ -19,6 +23,10 @@ on:
         required: false
         default: false
         type: boolean
+      infura_id:
+        description: 'Infura Project ID for network connectivity'
+        required: false
+        type: string
       tag:
         description: 'Version tag to deploy'
         required: true
@@ -54,17 +62,10 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
-        cache: ${{ github.event.inputs.tag == 'v1.3.0-1' && 'yarn' || 'npm' }}
+        cache: 'npm'
 
     - name: Install dependencies
-      run: |
-        if [ "${{ github.event.inputs.tag }}" = "v1.3.0-1" ]; then
-          echo "Using yarn for v1.3.0-1"
-          yarn install --frozen-lockfile
-        else
-          echo "Using npm for ${{ github.event.inputs.tag }}"
-          npm ci
-        fi
+      run: npm ci
 
     - name: Validate custom network input
       if: ${{ github.event.inputs.network == 'custom' }}
@@ -84,12 +85,7 @@ jobs:
         fi
 
     - name: Build contracts
-      run: |
-        if [ "${{ github.event.inputs.tag }}" = "v1.3.0-1" ]; then
-          yarn build
-        else
-          npm run build
-        fi
+      run: npm run build
 
     - name: Deploy contracts
       if: ${{ github.event.inputs.verify_only != 'true' }}
@@ -106,11 +102,7 @@ jobs:
           echo "Using ${{ github.event.inputs.deployment_method }} deployment method"
           echo "CUSTOM_DETERMINISTIC_DEPLOYMENT=$CUSTOM_DETERMINISTIC_DEPLOYMENT"
         fi
-        if [ "${{ github.event.inputs.tag }}" = "v1.3.0-1" ]; then
-          yarn deploy-all ${{ github.event.inputs.network || 'sepolia' }}
-        else
-          npx hardhat deploy-contracts --network ${{ github.event.inputs.network || 'sepolia' }}
-        fi
+        npx hardhat deploy-contracts --network ${{ github.event.inputs.network || 'sepolia' }}
 
     - name: Verify contracts only
       if: ${{ github.event.inputs.verify_only == 'true' }}
@@ -127,13 +119,8 @@ jobs:
           echo "Using ${{ github.event.inputs.deployment_method }} deployment method"
           echo "CUSTOM_DETERMINISTIC_DEPLOYMENT=$CUSTOM_DETERMINISTIC_DEPLOYMENT"
         fi
-        if [ "${{ github.event.inputs.tag }}" = "v1.3.0-1" ]; then
-          yarn hardhat --network ${{ github.event.inputs.network || 'sepolia' }} etherscan-verify
-          yarn hardhat --network ${{ github.event.inputs.network || 'sepolia' }} local-verify
-        else
-          npx hardhat etherscan-verify --network ${{ github.event.inputs.network || 'sepolia' }} --force-license true --license LGPL-3.0
-          npx hardhat sourcify --network ${{ github.event.inputs.network || 'sepolia' }}
-        fi
+        npx hardhat etherscan-verify --network ${{ github.event.inputs.network || 'sepolia' }} --force-license true --license LGPL-3.0
+        npx hardhat sourcify --network ${{ github.event.inputs.network || 'sepolia' }}
 
     - name: Generate deployment summary
       if: ${{ github.event.inputs.verify_only != 'true' }}
