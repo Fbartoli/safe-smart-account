@@ -6,7 +6,7 @@ on:
       network:
         description: 'Target network for deployment'
         required: true
-        default: 'sepolia'
+        default: 'custom'
         type: choice
         options:
         - custom
