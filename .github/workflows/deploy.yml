@@ -6,13 +6,9 @@ on:
       network:
         description: 'Target network for deployment'
         required: true
-        default: 'sepolia'
+        default: 'custom'
         type: choice
         options:
-        - sepolia
-        - mainnet
-        - gnosis
-        - zksync
         - custom
       custom_node_url:
         description: 'Custom RPC endpoint URL (required when network=custom)'
