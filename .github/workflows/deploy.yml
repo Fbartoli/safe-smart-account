@@ -54,7 +54,7 @@ jobs:
       run: npm run build
 
     - name: Deploy contracts
-      if: ${{ !github.event.inputs.verify_only }}
+      if: ${{ github.event.inputs.verify_only == false }}
       env:
         HARDHAT_NETWORK: ${{ github.event.inputs.network || 'sepolia' }}
         INFURA_KEY: ${{ secrets.INFURA_KEY }}
