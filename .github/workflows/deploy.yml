@@ -6,9 +6,13 @@ on:
       network:
         description: 'Target network for deployment'
         required: true
-        default: 'custom'
+        default: 'sepolia'
         type: choice
         options:
+        - sepolia
+        - mainnet
+        - gnosis
+        - zksync
         - custom
       custom_node_url:
         description: 'Custom RPC endpoint URL (required when network=custom)'
@@ -54,7 +58,7 @@ jobs:
       run: npm run build
 
     - name: Deploy contracts
-      if: ${{ github.event.inputs.verify_only == false }}
+      if: ${{ github.event.inputs.verify_only != 'true' }}
       env:
         HARDHAT_NETWORK: ${{ github.event.inputs.network || 'sepolia' }}
         INFURA_KEY: ${{ secrets.INFURA_KEY }}
@@ -66,7 +70,7 @@ jobs:
         npx hardhat deploy-contracts --network ${{ github.event.inputs.network || 'sepolia' }}
 
     - name: Verify contracts only
-      if: ${{ github.event.inputs.verify_only }}
+      if: ${{ github.event.inputs.verify_only == 'true' }}
       env:
         HARDHAT_NETWORK: ${{ github.event.inputs.network || 'sepolia' }}
         INFURA_KEY: ${{ secrets.INFURA_KEY }}
@@ -79,7 +83,7 @@ jobs:
         npx hardhat sourcify --network ${{ github.event.inputs.network || 'sepolia' }}
 
     - name: Generate deployment summary
-      if: ${{ !github.event.inputs.verify_only }}
+      if: ${{ github.event.inputs.verify_only != 'true' }}
       run: |
         echo "## 🚀 Smart Contract Deployment Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -135,7 +139,7 @@ jobs:
         echo "- Sourcify: ✅ Verified" >> $GITHUB_STEP_SUMMARY
 
     - name: Upload deployment artifacts
-      if: ${{ !github.event.inputs.verify_only }}
+      if: ${{ github.event.inputs.verify_only != 'true' }}
       uses: actions/upload-artifact@v4
       with:
         name: deployment-artifacts-${{ github.event.inputs.network == 'custom' && 'custom' || github.event.inputs.network || 'sepolia' }}-${{ github.sha }}
