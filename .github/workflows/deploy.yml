@@ -35,6 +35,14 @@ on:
         options:
         - v1.4.1-3
         - v1.3.0-libs.0
+      deployment_method:
+        description: 'Deployment method (only available for v1.3.0-libs.0)'
+        required: false
+        default: 'canonical'
+        type: choice
+        options:
+        - canonical
+        - eip155
 
 env:
   NODE_VERSION: 22.14.0
@@ -68,6 +76,14 @@ jobs:
         fi
         echo "✅ Custom network validation passed"
 
+    - name: Validate deployment method for tag
+      run: |
+        if [ "${{ github.event.inputs.tag }}" != "v1.3.0-libs.0" ] && [ "${{ github.event.inputs.deployment_method }}" = "eip155" ]; then
+          echo "⚠️ Warning: EIP-155 deployment method is only available for v1.3.0-libs.0. Using default deployment for ${{ github.event.inputs.tag }}"
+        elif [ "${{ github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
+          echo "✅ Deployment method '${{ github.event.inputs.deployment_method }}' is valid for ${{ github.event.inputs.tag }}"
+        fi
+
     - name: Build contracts
       run: npm run build
 
@@ -79,8 +95,13 @@ jobs:
         ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
         MNEMONIC: ${{ secrets.MNEMONIC }}
         NODE_URL: ${{ github.event.inputs.network == 'custom' && github.event.inputs.custom_node_url || secrets.NODE_URL }}
+        CUSTOM_DETERMINISTIC_DEPLOYMENT: ${{ github.event.inputs.tag == 'v1.3.0-libs.0' && github.event.inputs.deployment_method == 'eip155' && 'true' || 'false' }}
       run: |
         echo "Deploying to ${{ github.event.inputs.network || 'sepolia' }} network"
+        if [ "${{ github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
+          echo "Using ${{ github.event.inputs.deployment_method }} deployment method"
+          echo "CUSTOM_DETERMINISTIC_DEPLOYMENT=$CUSTOM_DETERMINISTIC_DEPLOYMENT"
+        fi
         npx hardhat deploy-contracts --network ${{ github.event.inputs.network || 'sepolia' }}
 
     - name: Verify contracts only
@@ -91,8 +112,13 @@ jobs:
         ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
         MNEMONIC: ${{ secrets.MNEMONIC }}
         NODE_URL: ${{ github.event.inputs.network == 'custom' && github.event.inputs.custom_node_url || secrets.NODE_URL }}
+        CUSTOM_DETERMINISTIC_DEPLOYMENT: ${{ github.event.inputs.tag == 'v1.3.0-libs.0' && github.event.inputs.deployment_method == 'eip155' && 'true' || 'false' }}
       run: |
         echo "Verifying contracts on ${{ github.event.inputs.network || 'sepolia' }} network"
+        if [ "${{ github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
+          echo "Using ${{ github.event.inputs.deployment_method }} deployment method"
+          echo "CUSTOM_DETERMINISTIC_DEPLOYMENT=$CUSTOM_DETERMINISTIC_DEPLOYMENT"
+        fi
         npx hardhat etherscan-verify --network ${{ github.event.inputs.network || 'sepolia' }} --force-license true --license LGPL-3.0
         npx hardhat sourcify --network ${{ github.event.inputs.network || 'sepolia' }}
 
@@ -109,6 +135,9 @@ jobs:
           DEPLOYMENT_DIR="deployments/${{ github.event.inputs.network || 'sepolia' }}"
         fi
         echo "**Tag:** \`${{ github.event.inputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
+          echo "**Deployment Method:** ${{ github.event.inputs.deployment_method }} ($([ "${{ github.event.inputs.deployment_method }}" = "eip155" ] && echo "Safe Singleton Factory" || echo "Deterministic Deployment Proxy"))" >> $GITHUB_STEP_SUMMARY
+        fi
         echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
 
@@ -152,11 +181,26 @@ jobs:
         echo "- Etherscan: ✅ Verified" >> $GITHUB_STEP_SUMMARY
         echo "- Sourcify: ✅ Verified" >> $GITHUB_STEP_SUMMARY
 
+        # Add deployment method specific information for v1.3.0-libs.0
+        if [ "${{ github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📄 Deployment Method Details" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event.inputs.deployment_method }}" = "eip155" ]; then
+            echo "- **Method**: EIP-155 Replay Protection" >> $GITHUB_STEP_SUMMARY
+            echo "- **Factory**: [Safe Singleton Factory](https://github.com/gnosis/safe-singleton-factory)" >> $GITHUB_STEP_SUMMARY
+            echo "- **Use Case**: Networks requiring replay protection" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Method**: Canonical Deployment" >> $GITHUB_STEP_SUMMARY
+            echo "- **Factory**: [Deterministic Deployment Proxy](https://github.com/Arachnid/deterministic-deployment-proxy)" >> $GITHUB_STEP_SUMMARY
+            echo "- **Use Case**: Standard networks (default)" >> $GITHUB_STEP_SUMMARY
+          fi
+        fi
+
     - name: Upload deployment artifacts
       if: ${{ github.event.inputs.verify_only != 'true' }}
       uses: actions/upload-artifact@v4
       with:
-        name: deployment-artifacts-${{ github.event.inputs.network == 'custom' && 'custom' || github.event.inputs.network || 'sepolia' }}-${{ github.sha }}
+        name: deployment-artifacts-${{ github.event.inputs.network == 'custom' && 'custom' || github.event.inputs.network || 'sepolia' }}-${{ github.event.inputs.tag }}-${{ github.event.inputs.tag == 'v1.3.0-libs.0' && github.event.inputs.deployment_method || 'default' }}-${{ github.sha }}
         path: |
           deployments/
           build/
@@ -173,5 +217,8 @@ jobs:
           echo "**Network:** ${{ github.event.inputs.network || 'sepolia' }}" >> $GITHUB_STEP_SUMMARY
         fi
         echo "**Tag:** \`${{ github.event.inputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
+          echo "**Deployment Method:** ${{ github.event.inputs.deployment_method }}" >> $GITHUB_STEP_SUMMARY
+        fi
         echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
         echo "**Error:** Check the logs above for details" >> $GITHUB_STEP_SUMMARY
