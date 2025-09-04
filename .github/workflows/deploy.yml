@@ -57,7 +57,7 @@ jobs:
         cache: 'npm'
 
     - name: Install dependencies
-      run: npm i
+      run: npm ci --ignore-scripts
 
     - name: Validate custom network input
       if: ${{ github.event.inputs.network == 'custom' }}
