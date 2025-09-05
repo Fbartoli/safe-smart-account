@@ -3,22 +3,10 @@ name: Deploy Contracts
 on:
   workflow_dispatch:
     inputs:
-      network:
-        description: 'Target network for deployment'
+      node_rpc_url:
+        description: 'RPC endpoint URL for blockchain connection'
         required: true
-        default: 'custom'
-        type: choice
-        options:
-        - custom
-      custom_node_url:
-        description: 'Custom RPC endpoint URL (required when network=custom)'
-        required: false
         type: string
-      verify_only:
-        description: 'Skip deployment and only verify existing contracts'
-        required: false
-        default: false
-        type: boolean
       tag:
         description: 'Version tag to deploy'
         required: true
@@ -35,7 +23,7 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.network || 'sepolia' }}
+    environment: custom
 
     steps:
     - name: Checkout code
@@ -56,17 +44,9 @@ jobs:
           yarn install --frozen-lockfile
         else
           echo "Using npm for ${{ github.event.inputs.tag }}"
-          npm ci --ignore-scripts
+          npm i --ignore-scripts
         fi
 
-    - name: Validate custom network input
-      if: ${{ github.event.inputs.network == 'custom' }}
-      run: |
-        if [ -z "${{ github.event.inputs.custom_node_url }}" ]; then
-          echo "❌ Error: Custom NODE_URL is required when using custom network"
-          exit 1
-        fi
-        echo "✅ Custom network validation passed"
 
 
     - name: Build contracts
@@ -78,51 +58,43 @@ jobs:
         fi
 
     - name: Deploy contracts
-      if: ${{ github.event.inputs.verify_only != 'true' }}
       env:
-        HARDHAT_NETWORK: ${{ github.event.inputs.network || 'sepolia' }}
+        HARDHAT_NETWORK: custom
         INFURA_KEY: ${{ secrets.INFURA_KEY }}
         ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
         MNEMONIC: ${{ secrets.MNEMONIC }}
-        NODE_URL: ${{ github.event.inputs.network == 'custom' && github.event.inputs.custom_node_url || secrets.NODE_URL }}
+        NODE_URL: ${{ github.event.inputs.node_rpc_url }}
       run: |
-        echo "Deploying to ${{ github.event.inputs.network || 'sepolia' }} network"
+        echo "Deploying to custom network"
         if [ "${{ github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
-          yarn deploy-all ${{ github.event.inputs.network || 'sepolia' }}
+          yarn deploy-all custom
         else
-          npx hardhat deploy-contracts --network ${{ github.event.inputs.network || 'sepolia' }}
+          npx hardhat deploy-contracts --network custom
         fi
 
-    - name: Verify contracts only
-      if: ${{ github.event.inputs.verify_only == 'true' }}
+    - name: Verify contracts
       env:
-        HARDHAT_NETWORK: ${{ github.event.inputs.network || 'sepolia' }}
+        HARDHAT_NETWORK: custom
         INFURA_KEY: ${{ secrets.INFURA_KEY }}
         ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
         MNEMONIC: ${{ secrets.MNEMONIC }}
-        NODE_URL: ${{ github.event.inputs.network == 'custom' && github.event.inputs.custom_node_url || secrets.NODE_URL }}
+        NODE_URL: ${{ github.event.inputs.node_rpc_url }}
       run: |
-        echo "Verifying contracts on ${{ github.event.inputs.network || 'sepolia' }} network"
+        echo "Verifying contracts on custom network"
         if [ "${{ github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
-          yarn hardhat --network ${{ github.event.inputs.network || 'sepolia' }} etherscan-verify
-          yarn hardhat --network ${{ github.event.inputs.network || 'sepolia' }} local-verify
+          yarn hardhat --network custom etherscan-verify
+          yarn hardhat --network custom local-verify
         else
-          npx hardhat etherscan-verify --network ${{ github.event.inputs.network || 'sepolia' }} --force-license true --license LGPL-3.0
-          npx hardhat sourcify --network ${{ github.event.inputs.network || 'sepolia' }}
+          npx hardhat etherscan-verify --network custom --force-license true --license LGPL-3.0
+          npx hardhat sourcify --network custom
         fi
 
     - name: Generate deployment summary
-      if: ${{ github.event.inputs.verify_only != 'true' }}
       run: |
         echo "## 🚀 Smart Contract Deployment Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        if [ "${{ github.event.inputs.network }}" = "custom" ]; then
-          echo "**Network:** Custom (${{ github.event.inputs.custom_node_url }})" >> $GITHUB_STEP_SUMMARY
-          DEPLOYMENT_DIR="deployments/custom"
-        else
-          echo "**Network:** ${{ github.event.inputs.network || 'sepolia' }}" >> $GITHUB_STEP_SUMMARY
-          DEPLOYMENT_DIR="deployments/${{ github.event.inputs.network || 'sepolia' }}"
-        fi
+        echo "**Network:** custom" >> $GITHUB_STEP_SUMMARY
+        DEPLOYMENT_DIR="deployments/custom"
         echo "**Tag:** \`${{ github.event.inputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
         echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
@@ -147,20 +119,7 @@ jobs:
 
         echo "### 🔗 Block Explorers" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        case "${{ github.event.inputs.network || 'sepolia' }}" in
-          "mainnet")
-            echo "- [Etherscan](https://etherscan.io/)" >> $GITHUB_STEP_SUMMARY
-            ;;
-          "sepolia")
-            echo "- [Etherscan Sepolia](https://sepolia.etherscan.io/)" >> $GITHUB_STEP_SUMMARY
-            ;;
-          "gnosis")
-            echo "- [Gnosis Chain Explorer](https://gnosisscan.io/)" >> $GITHUB_STEP_SUMMARY
-            ;;
-          "zksync")
-            echo "- [zkSync Explorer](https://explorer.zksync.io/)" >> $GITHUB_STEP_SUMMARY
-            ;;
-        esac
+        echo "- [Etherscan custom](https://custom.etherscan.io/)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
 
         echo "### ✅ Verification Status" >> $GITHUB_STEP_SUMMARY
@@ -169,10 +128,9 @@ jobs:
 
 
     - name: Upload deployment artifacts
-      if: ${{ github.event.inputs.verify_only != 'true' }}
       uses: actions/upload-artifact@v4
       with:
-        name: deployment-artifacts-${{ github.event.inputs.network == 'custom' && 'custom' || github.event.inputs.network || 'sepolia' }}-${{ github.event.inputs.tag }}-${{ github.sha }}
+        name: deployment-artifacts-custom-${{ github.event.inputs.tag }}-${{ github.sha }}
         path: |
           deployments/
           build/
@@ -183,11 +141,7 @@ jobs:
       run: |
         echo "## ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        if [ "${{ github.event.inputs.network }}" = "custom" ]; then
-          echo "**Network:** Custom (${{ github.event.inputs.custom_node_url }})" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "**Network:** ${{ github.event.inputs.network || 'sepolia' }}" >> $GITHUB_STEP_SUMMARY
-        fi
+        echo "**Network:** custom" >> $GITHUB_STEP_SUMMARY
         echo "**Tag:** \`${{ github.event.inputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
         echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
         echo "**Error:** Check the logs above for details" >> $GITHUB_STEP_SUMMARY
