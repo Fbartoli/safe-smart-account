@@ -13,93 +13,16 @@ env:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
-    environment: custom
-    
     strategy:
       fail-fast: false  # Continue other deployments if one fails
       matrix:
-        include:
-          - tag: "v1.4.1-3"
-            package_manager: "npm"
-            cache_key: "npm"
-            install_cmd: "npm i --ignore-scripts"
-            build_cmd: "npm run build"
-            
-          - tag: "v1.3.0-1"
-            package_manager: "npm"
-            cache_key: "npm"
-            install_cmd: "npm ci --ignore-scripts"
-            build_cmd: "npm run build"
-            
-          - tag: "v1.3.0-libs.0"
-            package_manager: "yarn"
-            cache_key: "yarn"
-            install_cmd: "yarn install --frozen-lockfile"
-            build_cmd: "yarn build"
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v5
-      with:
-        ref: ${{ matrix.tag }}
-
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: ${{ matrix.cache_key }}
-
-    - name: Install dependencies (${{ matrix.tag }})
-      run: |
-        echo "Installing dependencies for ${{ matrix.tag }} using ${{ matrix.package_manager }}"
-        ${{ matrix.install_cmd }}
-
-    - name: Build contracts (${{ matrix.tag }})
-      run: |
-        echo "Building contracts for ${{ matrix.tag }}"
-        ${{ matrix.build_cmd }}
-
-    - name: Deploy contracts (${{ matrix.tag }})
-      env:
-        HARDHAT_NETWORK: custom
-        INFURA_KEY: ${{ secrets.INFURA_KEY }}
-        ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
-        MNEMONIC: ${{ secrets.MNEMONIC }}
-        NODE_URL: ${{ github.event.inputs.node_rpc_url }}
-      run: |
-        echo "🚀 Deploying ${{ matrix.tag }} to custom network"
-        if [ "${{ matrix.tag }}" = "v1.3.0-libs.0" ]; then
-          yarn deploy-all custom
-        else
-          npx hardhat deploy-contracts --network custom
-        fi
-
-    - name: Verify contracts (${{ matrix.tag }})
-      env:
-        HARDHAT_NETWORK: custom
-        INFURA_KEY: ${{ secrets.INFURA_KEY }}
-        ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
-        MNEMONIC: ${{ secrets.MNEMONIC }}
-        NODE_URL: ${{ github.event.inputs.node_rpc_url }}
-      run: |
-        echo "🔍 Verifying ${{ matrix.tag }} on custom network"
-        if [ "${{ matrix.tag }}" = "v1.3.0-libs.0" ]; then
-          yarn hardhat --network custom etherscan-verify
-          yarn hardhat --network custom local-verify
-        else
-          npx hardhat etherscan-verify --network custom --force-license true --license LGPL-3.0
-          npx hardhat sourcify --network custom
-        fi
-
-    - name: Upload deployment artifacts (${{ matrix.tag }})
-      uses: actions/upload-artifact@v4
-      with:
-        name: deployment-artifacts-${{ matrix.tag }}-custom-${{ github.sha }}
-        path: |
-          deployments/
-          build/
-        retention-days: 30
+        tag: ["v1.4.1-3", "v1.3.0-1", "v1.3.0-libs.0"]
+    
+    uses: ./.github/workflows/deploy.yml
+    with:
+      node_rpc_url: ${{ github.event.inputs.node_rpc_url }}
+      tag: ${{ matrix.tag }}
+    secrets: inherit
 
   summary:
     needs: deploy
