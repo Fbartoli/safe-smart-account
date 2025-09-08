@@ -89,48 +89,118 @@ jobs:
         echo "Current directory: $(pwd)"
         echo "Contents: $(ls -la)"
         
-        # Copy folder 1 and rename it with the provided chainID
-        SOURCE_DIR="./node_modules/@gnosis.pm/safe-singleton-factory/artifacts/1"
-        TARGET_DIR="./node_modules/@gnosis.pm/safe-singleton-factory/artifacts/${{ github.event.inputs.chainID }}"
-        ARTIFACTS_BASE_DIR="./node_modules/@gnosis.pm/safe-singleton-factory/artifacts"
+        # Check for safe-singleton-factory package (try both old and new package names)
+        SAFE_SINGLETON_DIR_OLD="./node_modules/@gnosis.pm/safe-singleton-factory"
+        SAFE_SINGLETON_DIR_NEW="./node_modules/@safe-global/safe-singleton-factory"
         
-        # Check if target already exists
-        if [ -d "$TARGET_DIR" ]; then
-          echo "Target directory $TARGET_DIR already exists, skipping copy"
-        elif [ -d "$SOURCE_DIR" ]; then
-          echo "Copying $SOURCE_DIR to $TARGET_DIR"
-          cp -r "$SOURCE_DIR" "$TARGET_DIR"
-          echo "Successfully copied artifacts for chainID ${{ github.event.inputs.chainID }}"
+        # Determine which package is available
+        if [ -d "$SAFE_SINGLETON_DIR_NEW" ]; then
+          SAFE_SINGLETON_DIR="$SAFE_SINGLETON_DIR_NEW"
+          echo "Found @safe-global/safe-singleton-factory package"
+        elif [ -d "$SAFE_SINGLETON_DIR_OLD" ]; then
+          SAFE_SINGLETON_DIR="$SAFE_SINGLETON_DIR_OLD"
+          echo "Found @gnosis.pm/safe-singleton-factory package"
         else
-          echo "Warning: Source directory $SOURCE_DIR not found"
+          SAFE_SINGLETON_DIR=""
+          echo "No safe-singleton-factory package found"
+        fi
+        
+        ARTIFACTS_BASE_DIR="$SAFE_SINGLETON_DIR/artifacts"
+        SOURCE_DIR="$ARTIFACTS_BASE_DIR/1"
+        TARGET_DIR="$ARTIFACTS_BASE_DIR/${{ github.event.inputs.chainID }}"
+        
+        echo "Checking for safe-singleton-factory package..."
+        if [ -z "$SAFE_SINGLETON_DIR" ] || [ ! -d "$SAFE_SINGLETON_DIR" ]; then
+          echo "Safe-singleton-factory package not found. Checking alternative locations..."
           
-          # Show what's available for debugging
-          if [ -d "$ARTIFACTS_BASE_DIR" ]; then
-            echo "Available artifact folders in $ARTIFACTS_BASE_DIR:"
-            ls -la "$ARTIFACTS_BASE_DIR"
-            
-            # Try to find any numbered folder to copy from
-            FALLBACK_SOURCE=""
-            for dir in "$ARTIFACTS_BASE_DIR"/*; do
-              if [ -d "$dir" ] && [[ "$(basename "$dir")" =~ ^[0-9]+$ ]]; then
-                FALLBACK_SOURCE="$dir"
-                echo "Found fallback source: $(basename "$dir")"
-                break
-              fi
-            done
-            
-            if [ -n "$FALLBACK_SOURCE" ]; then
-              echo "Using fallback: copying $FALLBACK_SOURCE to $TARGET_DIR"
-              cp -r "$FALLBACK_SOURCE" "$TARGET_DIR"
-              echo "Successfully copied artifacts using fallback for chainID ${{ github.event.inputs.chainID }}"
-            else
-              echo "No suitable fallback found, creating minimal structure"
-              mkdir -p "$TARGET_DIR"
-              echo '{"address":"0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7","receipt":{"transactionHash":"0x0000000000000000000000000000000000000000000000000000000000000000"}}' > "$TARGET_DIR/deployment.json"
-              echo "Created minimal deployment.json for chainID ${{ github.event.inputs.chainID }}"
-            fi
+          # Check if it's in a different location or under a different name
+          echo "Contents of node_modules/@gnosis.pm:"
+          ls -la "./node_modules/@gnosis.pm/" 2>/dev/null || echo "  Directory not found"
+          echo "Contents of node_modules/@safe-global:"
+          ls -la "./node_modules/@safe-global/" 2>/dev/null || echo "  Directory not found"
+          
+          # Create the entire directory structure and minimal artifacts
+          # Use @safe-global path as default for new installations
+          DEFAULT_TARGET_DIR="./node_modules/@safe-global/safe-singleton-factory/artifacts/${{ github.event.inputs.chainID }}"
+          echo "Creating safe-singleton-factory artifacts structure for chainID ${{ github.event.inputs.chainID }}"
+          mkdir -p "$DEFAULT_TARGET_DIR"
+          
+          # Create a minimal deployment.json with the standard Safe singleton factory address
+          cat > "$DEFAULT_TARGET_DIR/deployment.json" << EOF
+{
+  "address": "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7",
+  "receipt": {
+    "transactionHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "blockNumber": 0,
+    "gasUsed": "0x0"
+  }
+}
+EOF
+          echo "Created safe-singleton-factory artifacts for chainID ${{ github.event.inputs.chainID }}"
+          
+        else
+          echo "Safe-singleton-factory package found at $SAFE_SINGLETON_DIR"
+          
+          # Check if target already exists
+          if [ -d "$TARGET_DIR" ]; then
+            echo "Target directory $TARGET_DIR already exists, skipping copy"
+          elif [ -d "$SOURCE_DIR" ]; then
+            echo "Copying $SOURCE_DIR to $TARGET_DIR"
+            cp -r "$SOURCE_DIR" "$TARGET_DIR"
+            echo "Successfully copied artifacts for chainID ${{ github.event.inputs.chainID }}"
           else
-            echo "Artifacts base directory not found: $ARTIFACTS_BASE_DIR"
+            echo "Source directory $SOURCE_DIR not found"
+            
+            # Show what's available for debugging
+            if [ -d "$ARTIFACTS_BASE_DIR" ]; then
+              echo "Available artifact folders in $ARTIFACTS_BASE_DIR:"
+              ls -la "$ARTIFACTS_BASE_DIR"
+              
+              # Try to find any numbered folder to copy from
+              FALLBACK_SOURCE=""
+              for dir in "$ARTIFACTS_BASE_DIR"/*; do
+                if [ -d "$dir" ] && [[ "$(basename "$dir")" =~ ^[0-9]+$ ]]; then
+                  FALLBACK_SOURCE="$dir"
+                  echo "Found fallback source: $(basename "$dir")"
+                  break
+                fi
+              done
+              
+              if [ -n "$FALLBACK_SOURCE" ]; then
+                echo "Using fallback: copying $FALLBACK_SOURCE to $TARGET_DIR"
+                cp -r "$FALLBACK_SOURCE" "$TARGET_DIR"
+                echo "Successfully copied artifacts using fallback for chainID ${{ github.event.inputs.chainID }}"
+              else
+                echo "No suitable fallback found, creating minimal structure"
+                mkdir -p "$TARGET_DIR"
+                cat > "$TARGET_DIR/deployment.json" << EOF
+{
+  "address": "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7",
+  "receipt": {
+    "transactionHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "blockNumber": 0,
+    "gasUsed": "0x0"
+  }
+}
+EOF
+                echo "Created minimal deployment.json for chainID ${{ github.event.inputs.chainID }}"
+              fi
+            else
+              echo "Artifacts base directory not found, creating from scratch"
+              DEFAULT_FALLBACK_DIR="./node_modules/@safe-global/safe-singleton-factory/artifacts/${{ github.event.inputs.chainID }}"
+              mkdir -p "$DEFAULT_FALLBACK_DIR"
+              cat > "$DEFAULT_FALLBACK_DIR/deployment.json" << EOF
+{
+  "address": "0x914d7Fec6aaC8cd542e72Bca78B30650d45643d7",
+  "receipt": {
+    "transactionHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "blockNumber": 0,
+    "gasUsed": "0x0"
+  }
+}
+EOF
+              echo "Created safe-singleton-factory artifacts from scratch for chainID ${{ github.event.inputs.chainID }}"
+            fi
           fi
         fi
         
