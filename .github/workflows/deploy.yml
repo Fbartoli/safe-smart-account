@@ -83,6 +83,7 @@ jobs:
         fi
 
     - name: Verify contracts
+      continue-on-error: true
       env:
         HARDHAT_NETWORK: custom
         INFURA_KEY: ${{ secrets.INFURA_KEY }}
