@@ -77,9 +77,9 @@ jobs:
       run: |
         echo "Deploying to custom network"
         if [ "${{ github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
-          yarn deploy-all custom
+          yarn deploy custom
         else
-          npx hardhat deploy-contracts --network custom
+          npm run deploy custom
         fi
 
     - name: Verify contracts
