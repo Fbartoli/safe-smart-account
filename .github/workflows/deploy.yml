@@ -110,6 +110,17 @@ jobs:
           if [ -d './node_modules/@gnosis.pm/safe-singleton-factory/artifacts' ]; then
             echo "Artifacts contents: $(ls -la ./node_modules/@gnosis.pm/safe-singleton-factory/artifacts/)"
           fi
+          
+          # Try to find what folders exist in artifacts
+          ARTIFACTS_DIR="./node_modules/@gnosis.pm/safe-singleton-factory/artifacts"
+          if [ -d "$ARTIFACTS_DIR" ]; then
+            echo "Available artifact folders:"
+            for dir in "$ARTIFACTS_DIR"/*; do
+              if [ -d "$dir" ]; then
+                echo "  Found: $(basename "$dir")"
+              fi
+            done
+          fi
         fi
         
         echo "Deploying to custom network"
