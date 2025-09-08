@@ -86,16 +86,16 @@ jobs:
         echo "Preparing safe-singleton-factory artifacts for chainID ${{ github.event.inputs.chainID }}"
         
         # Determine which package to use based on the tag version
-        if [ "${{ github.event.inputs.tag }}" = "v1.4.1-3" ]; then
-          # Use @safe-global for v1.4.1-3
-          SOURCE_DIR="./node_modules/@safe-global/safe-singleton-factory/artifacts/1"
-          TARGET_DIR="./node_modules/@safe-global/safe-singleton-factory/artifacts/${{ github.event.inputs.chainID }}"
-          echo "Using @safe-global/safe-singleton-factory for ${{ github.event.inputs.tag }}"
-        else
-          # Use @gnosis.pm for other versions
+        if [ "${{ github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
+          # Use @gnosis.pm only for v1.3.0-libs.0
           SOURCE_DIR="./node_modules/@gnosis.pm/safe-singleton-factory/artifacts/1"
           TARGET_DIR="./node_modules/@gnosis.pm/safe-singleton-factory/artifacts/${{ github.event.inputs.chainID }}"
           echo "Using @gnosis.pm/safe-singleton-factory for ${{ github.event.inputs.tag }}"
+        else
+          # Use @safe-global for all other versions (v1.4.1-3, v1.3.0-1, etc.)
+          SOURCE_DIR="./node_modules/@safe-global/safe-singleton-factory/artifacts/1"
+          TARGET_DIR="./node_modules/@safe-global/safe-singleton-factory/artifacts/${{ github.event.inputs.chainID }}"
+          echo "Using @safe-global/safe-singleton-factory for ${{ github.event.inputs.tag }}"
         fi
         
         if [ -d "$SOURCE_DIR" ]; then
