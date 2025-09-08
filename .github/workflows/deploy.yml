@@ -85,9 +85,13 @@ jobs:
       run: |
         echo "Preparing safe-singleton-factory artifacts for chainID ${{ github.event.inputs.chainID }}"
         
+        # List current directory and check for node_modules
+        echo "Current directory: $(pwd)"
+        echo "Contents: $(ls -la)"
+        
         # Copy folder 1 and rename it with the provided chainID
-        SOURCE_DIR="node_modules/@gnosis.pm/safe-singleton-factory/artifacts/1"
-        TARGET_DIR="node_modules/@gnosis.pm/safe-singleton-factory/artifacts/${{ github.event.inputs.chainID }}"
+        SOURCE_DIR="./node_modules/@gnosis.pm/safe-singleton-factory/artifacts/1"
+        TARGET_DIR="./node_modules/@gnosis.pm/safe-singleton-factory/artifacts/${{ github.event.inputs.chainID }}"
         
         if [ -d "$SOURCE_DIR" ]; then
           echo "Copying $SOURCE_DIR to $TARGET_DIR"
@@ -95,6 +99,17 @@ jobs:
           echo "Successfully copied artifacts for chainID ${{ github.event.inputs.chainID }}"
         else
           echo "Warning: Source directory $SOURCE_DIR not found"
+          echo "Let's check what's available:"
+          echo "Node modules exists: $([ -d './node_modules' ] && echo 'yes' || echo 'no')"
+          if [ -d './node_modules/@gnosis.pm' ]; then
+            echo "Gnosis.pm contents: $(ls -la ./node_modules/@gnosis.pm/)"
+          fi
+          if [ -d './node_modules/@gnosis.pm/safe-singleton-factory' ]; then
+            echo "Safe-singleton-factory contents: $(ls -la ./node_modules/@gnosis.pm/safe-singleton-factory/)"
+          fi
+          if [ -d './node_modules/@gnosis.pm/safe-singleton-factory/artifacts' ]; then
+            echo "Artifacts contents: $(ls -la ./node_modules/@gnosis.pm/safe-singleton-factory/artifacts/)"
+          fi
         fi
         
         echo "Deploying to custom network"
