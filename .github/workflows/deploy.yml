@@ -65,14 +65,30 @@ jobs:
           npm i --ignore-scripts
         fi
 
-
+    - name: Cache build artifacts
+      uses: actions/cache@v4
+      with:
+        path: |
+          build/
+          typechain-types/
+          cache/
+        key: build-artifacts-${{ github.event.inputs.tag }}-${{ hashFiles('contracts/**/*.sol', 'hardhat.config.ts') }}
+        restore-keys: |
+          build-artifacts-${{ github.event.inputs.tag }}-
+          build-artifacts-
 
     - name: Build contracts
       run: |
-        if [ "${{ github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
-          yarn build
+        # Check if build artifacts exist, if not, build them
+        if [ ! -d "build/artifacts" ] || [ ! -d "typechain-types" ]; then
+          echo "Build artifacts not found, compiling contracts..."
+          if [ "${{ github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
+            yarn build
+          else
+            npm run build
+          fi
         else
-          npm run build
+          echo "Build artifacts found, skipping compilation"
         fi
 
     - name: Deploy contracts
@@ -127,7 +143,7 @@ jobs:
           yarn hardhat --network custom etherscan-verify
           yarn hardhat --network custom local-verify
         else
-          npx hardhat etherscan-verify --network custom
+          npx hardhat etherscan-verify --network custom --api-url https://api.etherscan.io/v2/api?chainid=80094
           npx hardhat sourcify --network custom
         fi
 
