@@ -127,7 +127,7 @@ jobs:
           yarn hardhat --network custom etherscan-verify
           yarn hardhat --network custom local-verify
         else
-          npx hardhat etherscan-verify --network custom --force-license true --license LGPL-3.0
+          npx hardhat etherscan-verify --network custom
           npx hardhat sourcify --network custom
         fi
 
