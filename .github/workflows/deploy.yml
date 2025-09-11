@@ -20,6 +20,11 @@ on:
         description: 'Chain ID for the deployment'
         required: true
         type: string
+      api_url:
+        description: 'Block explorer API URL for contract verification'
+        required: false
+        default: 'https://api.etherscan.io/v2/api?chainid=1'
+        type: string
   workflow_call:
     inputs:
       node_rpc_url:
@@ -33,6 +38,11 @@ on:
       chainID:
         description: 'Chain ID for the deployment'
         required: true
+        type: string
+      api_url:
+        description: 'Block explorer API URL for contract verification'
+        required: false
+        default: 'https://api.etherscan.io/api'
         type: string
 
 env:
@@ -143,10 +153,10 @@ jobs:
           yarn hardhat --network custom etherscan-verify
           yarn hardhat --network custom local-verify
         else
-          npx hardhat etherscan-verify --network custom --api-url https://api.etherscan.io/v2/api?chainid=80094
+            npx hardhat etherscan-verify --network custom --api-url ${{ github.event.inputs.api_url }}
           npx hardhat sourcify --network custom
         fi
-
+        
     - name: Generate deployment summary
       run: |
         echo "## 🚀 Smart Contract Deployment Summary" >> $GITHUB_STEP_SUMMARY
