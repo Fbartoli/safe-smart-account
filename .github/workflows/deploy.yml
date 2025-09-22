@@ -57,35 +57,35 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v5
       with:
-        ref: ${{ github.event.inputs.tag }}
+        ref: ${{ inputs.tag || github.event.inputs.tag }}
         fetch-depth: 0  # Fetch all history and tags
         
     - name: Verify checkout tag
       run: |
-        echo "Requested tag: ${{ github.event.inputs.tag }}"
+        echo "Requested tag: ${{ inputs.tag || github.event.inputs.tag }}"
         echo "Current HEAD commit: $(git rev-parse HEAD)"
         echo "Current HEAD short: $(git rev-parse --short HEAD)"
         echo "Tags pointing to current HEAD:"
         git tag --points-at HEAD
         echo "Checking if we're on the correct tag..."
-        EXPECTED_COMMIT=$(git rev-parse ${{ github.event.inputs.tag }})
+        EXPECTED_COMMIT=$(git rev-parse ${{ inputs.tag || github.event.inputs.tag }})
         CURRENT_COMMIT=$(git rev-parse HEAD)
         if [ "$EXPECTED_COMMIT" = "$CURRENT_COMMIT" ]; then
-          echo "✅ Successfully checked out ${{ github.event.inputs.tag }}"
+          echo "✅ Successfully checked out ${{ inputs.tag || github.event.inputs.tag }}"
         else
           echo "❌ Tag mismatch! Attempting to fix..."
-          echo "Expected commit (from ${{ github.event.inputs.tag }}): $EXPECTED_COMMIT"
+          echo "Expected commit (from ${{ inputs.tag || github.event.inputs.tag }}): $EXPECTED_COMMIT"
           echo "Current commit: $CURRENT_COMMIT"
           echo "Available tags:"
           git tag --list | grep -E "v1\.[34]" | sort -V
           echo "Force checking out the correct tag..."
-          git checkout ${{ github.event.inputs.tag }}
+          git checkout ${{ inputs.tag || github.event.inputs.tag }}
           NEW_COMMIT=$(git rev-parse HEAD)
           if [ "$EXPECTED_COMMIT" = "$NEW_COMMIT" ]; then
-            echo "✅ Successfully corrected checkout to ${{ github.event.inputs.tag }}"
+            echo "✅ Successfully corrected checkout to ${{ inputs.tag || github.event.inputs.tag }}"
           else
             echo "❌ Still on wrong commit after force checkout"
-            echo "This indicates the tag ${{ github.event.inputs.tag }} might not exist or point to the expected commit"
+            echo "This indicates the tag ${{ inputs.tag || github.event.inputs.tag }} might not exist or point to the expected commit"
             exit 1
           fi
         fi
@@ -94,15 +94,15 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
-        cache: ${{ github.event.inputs.tag == 'v1.3.0-libs.0' && 'yarn' || 'npm' }}
+        cache: ${{ (inputs.tag || github.event.inputs.tag) == 'v1.3.0-libs.0' && 'yarn' || 'npm' }}
 
     - name: Install dependencies
       run: |
-        if [ "${{ github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
+        if [ "${{ inputs.tag || github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
           echo "Using yarn for v1.3.0-libs.0"
           yarn install --frozen-lockfile
         else
-          echo "Using npm for ${{ github.event.inputs.tag }}"
+          echo "Using npm for ${{ inputs.tag || github.event.inputs.tag }}"
           npm i --ignore-scripts
         fi
 
@@ -113,9 +113,9 @@ jobs:
           build/
           typechain-types/
           cache/
-        key: build-artifacts-${{ github.event.inputs.tag }}-${{ hashFiles('contracts/**/*.sol', 'hardhat.config.ts') }}
+        key: build-artifacts-${{ inputs.tag || github.event.inputs.tag }}-${{ hashFiles('contracts/**/*.sol', 'hardhat.config.ts') }}
         restore-keys: |
-          build-artifacts-${{ github.event.inputs.tag }}-
+          build-artifacts-${{ inputs.tag || github.event.inputs.tag }}-
           build-artifacts-
 
     - name: Build contracts
@@ -123,7 +123,7 @@ jobs:
         # Check if build artifacts exist, if not, build them
         if [ ! -d "build/artifacts" ] || [ ! -d "typechain-types" ]; then
           echo "Build artifacts not found, compiling contracts..."
-          if [ "${{ github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
+          if [ "${{ inputs.tag || github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
             yarn build
           else
             npm run build
@@ -138,33 +138,33 @@ jobs:
         INFURA_KEY: ${{ secrets.INFURA_KEY }}
         ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
         MNEMONIC: ${{ secrets.MNEMONIC }}
-        NODE_URL: ${{ github.event.inputs.node_rpc_url }}
+        NODE_URL: ${{ inputs.node_rpc_url || github.event.inputs.node_rpc_url }}
       run: |
-        echo "Preparing safe-singleton-factory artifacts for chainID ${{ github.event.inputs.chainID }}"
+        echo "Preparing safe-singleton-factory artifacts for chainID ${{ inputs.chainID || github.event.inputs.chainID }}"
         
         # Determine which package to use based on the tag version
-        if [ "${{ github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
+        if [ "${{ inputs.tag || github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
           # Use @gnosis.pm only for v1.3.0-libs.0
           SOURCE_DIR="./node_modules/@gnosis.pm/safe-singleton-factory/artifacts/1"
-          TARGET_DIR="./node_modules/@gnosis.pm/safe-singleton-factory/artifacts/${{ github.event.inputs.chainID }}"
-          echo "Using @gnosis.pm/safe-singleton-factory for ${{ github.event.inputs.tag }}"
+          TARGET_DIR="./node_modules/@gnosis.pm/safe-singleton-factory/artifacts/${{ inputs.chainID || github.event.inputs.chainID }}"
+          echo "Using @gnosis.pm/safe-singleton-factory for ${{ inputs.tag || github.event.inputs.tag }}"
         else
           # Use @safe-global for all other versions (v1.4.1-3, v1.3.0-1, etc.)
           SOURCE_DIR="./node_modules/@safe-global/safe-singleton-factory/artifacts/1"
-          TARGET_DIR="./node_modules/@safe-global/safe-singleton-factory/artifacts/${{ github.event.inputs.chainID }}"
-          echo "Using @safe-global/safe-singleton-factory for ${{ github.event.inputs.tag }}"
+          TARGET_DIR="./node_modules/@safe-global/safe-singleton-factory/artifacts/${{ inputs.chainID || github.event.inputs.chainID }}"
+          echo "Using @safe-global/safe-singleton-factory for ${{ inputs.tag || github.event.inputs.tag }}"
         fi
         
         if [ -d "$SOURCE_DIR" ]; then
           echo "Copying $SOURCE_DIR to $TARGET_DIR"
           cp -r "$SOURCE_DIR" "$TARGET_DIR"
-          echo "Successfully copied artifacts for chainID ${{ github.event.inputs.chainID }}"
+          echo "Successfully copied artifacts for chainID ${{ inputs.chainID || github.event.inputs.chainID }}"
         else
           echo "Warning: Source directory $SOURCE_DIR not found"
         fi
         
         echo "Deploying to custom network"
-        if [ "${{ github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
+        if [ "${{ inputs.tag || github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
           yarn deploy custom
         else
           npm run deploy custom
@@ -177,14 +177,14 @@ jobs:
         INFURA_KEY: ${{ secrets.INFURA_KEY }}
         ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
         MNEMONIC: ${{ secrets.MNEMONIC }}
-        NODE_URL: ${{ github.event.inputs.node_rpc_url }}
+        NODE_URL: ${{ inputs.node_rpc_url || github.event.inputs.node_rpc_url }}
       run: |
         echo "Verifying contracts on custom network"
-        if [ "${{ github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
+        if [ "${{ inputs.tag || github.event.inputs.tag }}" = "v1.3.0-libs.0" ]; then
           yarn hardhat --network custom etherscan-verify
           yarn hardhat --network custom local-verify
         else
-            npx hardhat etherscan-verify --network custom --api-url ${{ github.event.inputs.api_url }}
+            npx hardhat etherscan-verify --network custom --api-url ${{ inputs.api_url || github.event.inputs.api_url }}
           npx hardhat sourcify --network custom
         fi
         
@@ -194,7 +194,7 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Network:** custom" >> $GITHUB_STEP_SUMMARY
         DEPLOYMENT_DIR="deployments/custom"
-        echo "**Requested Tag:** \`${{ github.event.inputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "**Requested Tag:** \`${{ inputs.tag || github.event.inputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
         echo "**Actual Commit:** \`$(git rev-parse --short HEAD)\`" >> $GITHUB_STEP_SUMMARY
         echo "**Actual Tags:** \`$(git tag --points-at HEAD | tr '\n' ', ' | sed 's/,$//')\`" >> $GITHUB_STEP_SUMMARY
         echo "**Workflow Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
@@ -231,7 +231,7 @@ jobs:
     - name: Upload deployment artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: deployment-artifacts-custom-${{ github.event.inputs.tag }}-${{ github.sha }}
+        name: deployment-artifacts-custom-${{ inputs.tag || github.event.inputs.tag }}-${{ github.sha }}
         path: |
           deployments/
           build/
@@ -243,6 +243,6 @@ jobs:
         echo "## ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Network:** custom" >> $GITHUB_STEP_SUMMARY
-        echo "**Tag:** \`${{ github.event.inputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "**Tag:** \`${{ inputs.tag || github.event.inputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
         echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
         echo "**Error:** Check the logs above for details" >> $GITHUB_STEP_SUMMARY
