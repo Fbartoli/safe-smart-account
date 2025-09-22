@@ -58,6 +58,37 @@ jobs:
       uses: actions/checkout@v5
       with:
         ref: ${{ github.event.inputs.tag }}
+        fetch-depth: 0  # Fetch all history and tags
+        
+    - name: Verify checkout tag
+      run: |
+        echo "Requested tag: ${{ github.event.inputs.tag }}"
+        echo "Current HEAD commit: $(git rev-parse HEAD)"
+        echo "Current HEAD short: $(git rev-parse --short HEAD)"
+        echo "Tags pointing to current HEAD:"
+        git tag --points-at HEAD
+        echo "Checking if we're on the correct tag..."
+        EXPECTED_COMMIT=$(git rev-parse ${{ github.event.inputs.tag }})
+        CURRENT_COMMIT=$(git rev-parse HEAD)
+        if [ "$EXPECTED_COMMIT" = "$CURRENT_COMMIT" ]; then
+          echo "✅ Successfully checked out ${{ github.event.inputs.tag }}"
+        else
+          echo "❌ Tag mismatch! Attempting to fix..."
+          echo "Expected commit (from ${{ github.event.inputs.tag }}): $EXPECTED_COMMIT"
+          echo "Current commit: $CURRENT_COMMIT"
+          echo "Available tags:"
+          git tag --list | grep -E "v1\.[34]" | sort -V
+          echo "Force checking out the correct tag..."
+          git checkout ${{ github.event.inputs.tag }}
+          NEW_COMMIT=$(git rev-parse HEAD)
+          if [ "$EXPECTED_COMMIT" = "$NEW_COMMIT" ]; then
+            echo "✅ Successfully corrected checkout to ${{ github.event.inputs.tag }}"
+          else
+            echo "❌ Still on wrong commit after force checkout"
+            echo "This indicates the tag ${{ github.event.inputs.tag }} might not exist or point to the expected commit"
+            exit 1
+          fi
+        fi
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -163,8 +194,10 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Network:** custom" >> $GITHUB_STEP_SUMMARY
         DEPLOYMENT_DIR="deployments/custom"
-        echo "**Tag:** \`${{ github.event.inputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
-        echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "**Requested Tag:** \`${{ github.event.inputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "**Actual Commit:** \`$(git rev-parse --short HEAD)\`" >> $GITHUB_STEP_SUMMARY
+        echo "**Actual Tags:** \`$(git tag --points-at HEAD | tr '\n' ', ' | sed 's/,$//')\`" >> $GITHUB_STEP_SUMMARY
+        echo "**Workflow Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
 
         # Check if deployment artifacts exist and extract addresses
